@@ -252,20 +252,23 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 로컬 환경 체크
-        // 💡 중요: 깃허브 페이지 등 외부에 서비스하려면 본인의 Firebase 프로젝트 키를 아래에 입력해야 합니다!
-        // =========================================================================
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        // =========================================================================
+        // 💡 캔버스 환경과 깃허브 배포 환경을 모두 지원하도록 자동 감지합니다.
+        let firebaseConfig;
+        if (typeof __firebase_config !== 'undefined') {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            // 💡 중요: 깃허브 페이지 등 외부에 서비스하려면 본인의 Firebase 프로젝트 키를 아래에 입력해야 합니다!
+            firebaseConfig = {
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID"
+            };
+        }
         
-        const appId = 'soop-match-survival'; 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'soop-match-survival'; 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -369,7 +372,7 @@
         // -- 1. 인증 로직 --
         const initAuth = async () => {
             try {
-                if (!isLocalEnv && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
@@ -380,9 +383,7 @@
                 }
             } catch (e) {
                 console.error("Auth Error", e);
-                if (isLocalEnv) {
-                    window.showToast("로컬 환경 DB 접근 권한이 없습니다.", true);
-                }
+                window.showToast("인증 실패: DB 설정을 확인하세요.", true);
             }
         };
 
