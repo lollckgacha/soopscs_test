@@ -264,14 +264,14 @@
         if (isCanvas) {
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
-            // 💡 중요: 깃허브 페이지 등 외부에 서비스하려면 본인의 Firebase 프로젝트 키를 아래에 입력해야 합니다!
+            // 💡 기존 천타버스 퀴즈 및 싱글플레이에서 사용하던 Firebase 키 자동 적용
             firebaseConfig = {
-                apiKey: "YOUR_API_KEY",
-                authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-                projectId: "YOUR_PROJECT_ID",
-                storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-                messagingSenderId: "YOUR_SENDER_ID",
-                appId: "YOUR_APP_ID"
+                apiKey: atob("QUl6YVN5QTFBa0lVMVVqdXhiX0c4dWpJNFFHTlJXNkhjOHRwZnln"),
+                authDomain: atob("ZG9uZ3BhMjAyNi0yZmRhNS5maXJlYmFzZWFwcC5jb20="),
+                projectId: atob("ZG9uZ3BhMjAyNi0yZmRhNQ=="),
+                storageBucket: atob("ZG9uZ3BhMjAyNi0yZmRhNS5maXJlYmFzZXN0b3JhZ2UuYXBw"),
+                messagingSenderId: atob("MTAwODI3NTYxNTgwNg=="),
+                appId: atob("MToxMDA4Mjc1NjE1ODA2OndlYjpiMzIzMGEyZDE4YTc3YWVjYjUyMTZm")
             };
         }
         
@@ -280,7 +280,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // 키 미설정 경고 표시
+        // 키 미설정 경고 표시 (키가 적용되었으므로 조건이 맞지 않아 경고창이 뜨지 않음)
         if (!isCanvas && firebaseConfig.apiKey === "YOUR_API_KEY") {
             document.getElementById('local-warning').classList.remove('hidden');
         }
