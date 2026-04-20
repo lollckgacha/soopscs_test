@@ -114,18 +114,34 @@
             </button>
         </div>
 
-        <!-- [2] 로비 뷰 -->
-        <div id="view-lobby" class="w-full max-w-2xl h-full flex flex-col hidden bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <h2 class="text-2xl font-black text-slate-800">게임 대기실</h2>
-                <button onclick="window.createRoom()" class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    방 만들기
-                </button>
+        <!-- [2] 로비 뷰 (방 코드 입력 방식) -->
+        <div id="view-lobby" class="w-full max-w-md h-auto flex flex-col hidden bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex flex-col items-center bg-slate-50 shrink-0">
+                <h2 class="text-2xl font-black text-slate-800 mb-2">게임 대기실</h2>
+                <p class="text-sm text-slate-500 font-medium text-center">새로운 방을 만들거나 입장 코드를 입력하세요.</p>
             </div>
-            <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100/50">
-                <div id="room-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <!-- 방 목록 렌더링 -->
+            
+            <div class="p-6 flex flex-col gap-6 bg-white">
+                <!-- 방 만들기 -->
+                <div class="flex flex-col gap-3">
+                    <button onclick="window.createRoom()" class="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-lg flex items-center justify-center gap-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        새로운 방 만들기
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-3 w-full">
+                    <hr class="flex-1 border-slate-200">
+                    <span class="text-xs text-slate-400 font-bold">또는</span>
+                    <hr class="flex-1 border-slate-200">
+                </div>
+
+                <!-- 코드 입력 입장 -->
+                <div class="flex flex-col gap-3">
+                    <input type="text" id="room-code-input" placeholder="입장 코드 6자리 입력" maxlength="6" class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-center text-xl tracking-[0.5em] font-black focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all uppercase placeholder:tracking-normal placeholder:font-normal placeholder:text-sm">
+                    <button onclick="window.joinRoomByCode()" class="w-full py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 text-lg">
+                        입장 코드로 참여하기
+                    </button>
                 </div>
             </div>
         </div>
@@ -133,8 +149,11 @@
         <!-- [3] 대기방 뷰 -->
         <div id="view-room" class="w-full max-w-xl bg-white p-6 rounded-3xl shadow-xl border border-slate-200 flex flex-col hidden">
             <div class="flex justify-between items-center mb-6 border-b pb-4">
-                <h2 class="text-2xl font-black text-slate-800">방 입장코드: <span id="room-id-display" class="text-blue-600 font-mono tracking-widest text-lg"></span></h2>
-                <button onclick="window.leaveRoom()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm border border-slate-300">나가기</button>
+                <div class="flex flex-col">
+                    <span class="text-xs font-bold text-slate-500 mb-1">방 입장 코드 (친구에게 공유하세요!)</span>
+                    <h2 class="text-3xl font-black text-slate-800"><span id="room-id-display" class="text-blue-600 font-mono tracking-[0.2em] bg-blue-50 px-3 py-1 rounded-lg border border-blue-200 select-all cursor-pointer" onclick="window.copyRoomCode()" title="클릭하여 복사"></span></h2>
+                </div>
+                <button onclick="window.leaveRoom()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm border border-slate-300 shrink-0">나가기</button>
             </div>
             
             <h3 class="text-lg font-bold text-slate-700 mb-3 flex items-center gap-2">
@@ -257,7 +276,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        console.log("Multiplayer Build Version: 2.1 (Cache Busting)");
+        console.log("Multiplayer Build Version: 3.0 (Private Room Code System)");
 
         // 환경 감지
         const isCanvas = typeof __firebase_config !== 'undefined';
@@ -288,13 +307,11 @@
         }
 
         // -- 전역 상태 변수 --
-        // 로컬 테스트(동일 브라우저 멀티 탭)에서 유저 덮어씌움 현상을 막기 위해, 고유한 Session ID 발급
         const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
         window.myUser = { uid: null, name: '', sessionId: generateId() };
         window.currentRoomId = null;
         window.isHost = false;
         
-        let roomsUnsubscribe = null;
         let activeRoomUnsubscribe = null;
         
         // 인게임 로컬 상태
@@ -342,6 +359,23 @@
             if (viewId === 'view-game') setTimeout(resizeBoard, 100);
         };
 
+        // 방 코드 복사
+        window.copyRoomCode = () => {
+            const code = document.getElementById('room-id-display').innerText;
+            if(!code) return;
+            const textArea = document.createElement("textarea");
+            textArea.value = code;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                window.showToast("방 코드가 복사되었습니다!");
+            } catch (err) {
+                window.showToast("복사에 실패했습니다.", true);
+            }
+            document.body.removeChild(textArea);
+        };
+
         // 구글 로그인 기능 추가
         window.loginWithGoogle = async function() {
             const p = new GoogleAuthProvider();
@@ -356,7 +390,6 @@
         window.logoutGoogle = async function() {
             try {
                 await signOut(auth);
-                // 로그아웃 시 다시 익명으로 연결하여 기본 플레이 가능하도록 유지
                 await signInAnonymously(auth);
             } catch (e) { console.error(e); }
         };
@@ -381,8 +414,8 @@
             document.getElementById('user-info').classList.remove('hidden');
             document.getElementById('my-nickname').innerText = nick;
             
+            // 방 목록 조회 없이 바로 로비화면 렌더링
             switchView('view-lobby');
-            listenToRooms();
         };
 
         // -- 1. 인증 로직 --
@@ -415,7 +448,6 @@
                 window.myUser.uid = user.uid; 
                 
                 if (!user.isAnonymous) {
-                    // 구글 로그인 상태
                     if(btnHeader) btnHeader.classList.add('hidden');
                     if(profileHeader) {
                         profileHeader.classList.remove('hidden');
@@ -426,12 +458,10 @@
                     if(btnMain) btnMain.classList.add('hidden');
                     if(dividerMain) dividerMain.classList.add('hidden');
                     
-                    // 닉네임 입력칸에 구글 이름 자동 채우기 (비어있을 때만)
                     if(nickInput && !nickInput.value) {
                         nickInput.value = user.displayName || "";
                     }
                 } else {
-                    // 익명 로그인 상태
                     if(btnHeader) btnHeader.classList.remove('hidden');
                     if(profileHeader) {
                         profileHeader.classList.add('hidden');
@@ -457,54 +487,28 @@
 
         initAuth();
 
-        // -- 2. 로비 구독 --
-        const listenToRooms = () => {
-            if (roomsUnsubscribe) roomsUnsubscribe();
-            
-            const roomsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
-            roomsUnsubscribe = onSnapshot(roomsRef, (snapshot) => {
-                const listEl = document.getElementById('room-list');
-                listEl.innerHTML = '';
-                
-                let hasRooms = false;
-                snapshot.forEach(docSnap => {
-                    const room = docSnap.data();
-                    if (room.status === 'waiting') {
-                        hasRooms = true;
-                        const pCount = Object.keys(room.players || {}).length;
-                        
-                        const div = document.createElement('div');
-                        div.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-400 transition-colors gap-3";
-                        div.innerHTML = `
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <div class="font-black text-slate-800 text-lg">방 #${docSnap.id.substring(0,6).toUpperCase()}</div>
-                                    <div class="text-xs text-slate-500 font-medium mt-0.5">방장: ${room.hostName || '알 수 없음'}</div>
-                                </div>
-                                <div class="bg-blue-50 text-blue-600 font-bold px-2 py-1 rounded text-xs">${pCount}/100 명</div>
-                            </div>
-                            <button onclick="window.joinRoom('${docSnap.id}')" ${pCount >= 100 ? 'disabled' : ''} class="w-full py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white font-bold rounded-lg transition-colors">
-                                ${pCount >= 100 ? '만원' : '입장하기'}
-                            </button>
-                        `;
-                        listEl.appendChild(div);
-                    }
-                });
-                
-                if (!hasRooms) {
-                    listEl.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 font-bold bg-slate-50 rounded-xl border border-slate-200 border-dashed">개설된 방이 없습니다.<br>새로운 방을 만들어보세요!</div>';
-                }
-            }, (error) => { 
-                console.error("방 목록 로드 실패:", error); 
-                window.showToast("방 목록을 불러오지 못했습니다: " + error.message, true);
-            });
+        // -- 3. 방 조작 --
+        
+        // 6자리 영어/숫자 난수 생성기
+        const generateRoomCode = () => {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 혼동하기 쉬운 문자(I,O,1,0) 제외
+            let code = '';
+            for(let i=0; i<6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
         };
 
-        // -- 3. 방 조작 --
         window.createRoom = async () => {
             if(!window.myUser.uid) return window.showToast("서버 연결 상태를 확인해주세요.", true);
             try {
-                const roomRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
+                const roomCode = generateRoomCode();
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+                
+                // 혹시나 코드가 중복될 경우 대비
+                const snap = await getDoc(roomRef);
+                if (snap.exists()) {
+                    return window.createRoom(); // 중복시 다시 생성
+                }
+
                 const initialPlayers = {};
                 initialPlayers[window.myUser.sessionId] = {
                     name: window.myUser.name,
@@ -521,11 +525,22 @@
                     players: initialPlayers,
                     createdAt: Date.now()
                 });
-                enterRoom(roomRef.id, true);
+                
+                window.showToast("방이 생성되었습니다! 친구들에게 코드를 알려주세요.");
+                enterRoom(roomCode, true);
             } catch (e) { 
                 console.error("방 생성 에러:", e); 
                 window.showToast("방 생성 실패: " + e.message, true); 
             }
+        };
+
+        // 방 코드를 입력받아 입장하는 새로운 함수
+        window.joinRoomByCode = () => {
+            const codeInput = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if(codeInput.length !== 6) {
+                return window.showToast("6자리 코드를 정확히 입력해주세요.", true);
+            }
+            window.joinRoom(codeInput);
         };
 
         window.joinRoom = async (roomId) => {
@@ -533,10 +548,10 @@
             try {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
                 const snap = await getDoc(roomRef);
-                if (!snap.exists()) return window.showToast("존재하지 않는 방입니다.", true);
+                if (!snap.exists()) return window.showToast("존재하지 않는 방입니다. 코드를 다시 확인해주세요.", true);
                 
                 const room = snap.data();
-                if (room.status !== 'waiting') return window.showToast("이미 게임이 진행중입니다.", true);
+                if (room.status !== 'waiting') return window.showToast("이미 게임이 진행중인 방입니다.", true);
                 
                 const playersCount = Object.keys(room.players || {}).length;
                 if (playersCount >= 100 && !room.players[window.myUser.sessionId]) return window.showToast("인원이 가득 찼습니다.", true);
@@ -562,11 +577,10 @@
         };
 
         const enterRoom = (roomId, hostStatus) => {
-            if (roomsUnsubscribe) { roomsUnsubscribe(); roomsUnsubscribe = null; }
             window.currentRoomId = roomId;
             window.isHost = hostStatus;
             
-            document.getElementById('room-id-display').innerText = roomId.substring(0, 6).toUpperCase();
+            document.getElementById('room-id-display').innerText = roomId; // 6자리 코드를 바로 사용
             
             if (window.isHost) {
                 document.getElementById('btn-start-game').classList.remove('hidden');
@@ -575,6 +589,10 @@
                 document.getElementById('btn-start-game').classList.add('hidden');
                 document.getElementById('msg-waiting-host').classList.remove('hidden');
             }
+
+            // 방 코드 입력창 초기화
+            const codeInput = document.getElementById('room-code-input');
+            if(codeInput) codeInput.value = '';
 
             switchView('view-room');
             listenToActiveRoom();
@@ -611,7 +629,6 @@
             window.currentRoomId = null;
             window.isHost = false;
             switchView('view-lobby');
-            listenToRooms();
         };
 
         // -- 4. 방 상태 실시간 구독 --
