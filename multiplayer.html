@@ -62,7 +62,12 @@
 
     <!-- 헤더 -->
     <div class="bg-white px-4 py-3 border-b border-slate-200 flex justify-between items-center shadow-sm z-50 shrink-0">
-        <h1 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-600">SOOP 사천성 서바이벌</h1>
+        <div class="flex items-center gap-3">
+            <button onclick="location.href='index.html'" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors" title="싱글플레이로 돌아가기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
+            <h1 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-600">SOOP 사천성 서바이벌</h1>
+        </div>
         <div id="user-info" class="text-sm font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full hidden flex items-center gap-2">
             <span>👤 <span id="my-nickname" class="text-blue-600"></span></span>
         </div>
@@ -108,9 +113,9 @@
             </div>
             
             <h3 class="text-lg font-bold text-slate-700 mb-3 flex items-center gap-2">
-                👥 참가자 목록 <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm"><span id="player-count">1</span>명</span>
+                👥 참가자 목록 <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm"><span id="player-count">1</span>/100명</span>
             </h3>
-            <div id="player-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-200 min-h-[150px] content-start">
+            <div id="player-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-200 min-h-[150px] max-h-64 overflow-y-auto content-start">
                 <!-- 참가자 목록 -->
             </div>
 
@@ -209,7 +214,7 @@
             <!-- 게임 완전 종료 오버레이 (전체 종료시) -->
             <div id="overlay-global-end" class="absolute inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex-col items-center justify-center hidden rounded-xl">
                 <h2 class="text-5xl font-black text-white mb-8 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500 drop-shadow-md">최종 결과</h2>
-                <div id="final-results-list" class="flex flex-col gap-4 w-full max-w-sm mb-10 px-4">
+                <div id="final-results-list" class="flex flex-col gap-4 w-full max-w-sm mb-10 px-4 max-h-96 overflow-y-auto">
                     <!-- 결과 목록 -->
                 </div>
                 <button onclick="window.backToRoom()" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-xl shadow-xl transition-all hover:-translate-y-1 active:scale-95 hidden host-only-btn">
@@ -224,25 +229,23 @@
     <!-- Firebase 및 게임 로직 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase 설정 (필수 RULE 1, 3 준수)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'soop-match-survival';
-        let firebaseConfig;
-        if (typeof __firebase_config !== 'undefined') {
-            firebaseConfig = JSON.parse(__firebase_config);
-        } else {
-            firebaseConfig = {
-                apiKey: atob("QUl6YVN5QTFBa0lVMVVqdXhiX0c4dWpJNFFHTlJXNkhjOHRwZnln"),
-                authDomain: atob("ZG9uZ3BhMjAyNi0yZmRhNS5maXJlYmFzZWFwcC5jb20="),
-                projectId: atob("ZG9uZ3BhMjAyNi0yZmRhNQ=="),
-                storageBucket: atob("ZG9uZ3BhMjAyNi0yZmRhNS5maXJlYmFzZXN0b3JhZ2UuYXBw"),
-                messagingSenderId: atob("MTAwODI3NTYxNTgwNg=="),
-                appId: atob("MToxMDA4Mjc1NjE1ODA2OndlYjpiMzIzMGEyZDE4YTc3YWVjYjUyMTZm")
-            };
-        }
-
+        // =========================================================================
+        // 💡 중요: 깃허브 페이지 등 외부에 서비스하려면 본인의 Firebase 프로젝트 키를 아래에 입력해야 합니다!
+        // =========================================================================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        // =========================================================================
+        
+        const appId = 'soop-match-survival'; 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -272,7 +275,7 @@
         let gameStatus = 'waiting'; 
         let gameEndTime = 0;
         let mainTimerInterval = null;
-        let playersData = {}; // 서버에서 받아온 다른 사람들의 상태
+        let playersData = {};
 
         // -- 유틸리티 --
         window.showToast = (msg, isError = false) => {
@@ -300,28 +303,14 @@
             if (viewId === 'view-game') setTimeout(resizeBoard, 100);
         };
 
-        // -- 1. 인증 로직 (Top-level Await 활용 RULE 3) --
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (e) {
-                console.error("Auth Error", e);
-            }
-        };
-        await initAuth(); // 핵심: 인증 완료 후 진행 보장
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) { window.myUser.uid = user.uid; }
-        });
-
+        // UI 이벤트
         window.joinMultiplayer = () => {
             const nick = document.getElementById('nickname-input').value.trim();
             if(!nick) return window.showToast("닉네임을 입력해주세요.", true);
-            if(!window.myUser.uid) return window.showToast("인증 서버 연결 오류.", true);
+            
+            if(!window.myUser.uid) {
+                return window.showToast("서버에 연결 중이거나 Firebase 설정이 올바르지 않습니다.", true);
+            }
             
             window.myUser.name = nick;
             document.getElementById('user-info').classList.remove('hidden');
@@ -330,6 +319,24 @@
             switchView('view-lobby');
             listenToRooms();
         };
+
+        // -- 1. 인증 로직 --
+        const initAuth = async () => {
+            try {
+                await signInAnonymously(auth);
+                if(auth.currentUser) {
+                    window.myUser.uid = auth.currentUser.uid;
+                }
+            } catch (e) {
+                console.error("Auth Error", e);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) { window.myUser.uid = user.uid; }
+        });
+
+        initAuth();
 
         // -- 2. 로비 구독 --
         const listenToRooms = () => {
@@ -355,10 +362,10 @@
                                     <div class="font-black text-slate-800 text-lg">방 #${docSnap.id.substring(0,6).toUpperCase()}</div>
                                     <div class="text-xs text-slate-500 font-medium mt-0.5">방장: ${room.hostName || '알 수 없음'}</div>
                                 </div>
-                                <div class="bg-blue-50 text-blue-600 font-bold px-2 py-1 rounded text-xs">${pCount}/4 명</div>
+                                <div class="bg-blue-50 text-blue-600 font-bold px-2 py-1 rounded text-xs">${pCount}/100 명</div>
                             </div>
-                            <button onclick="window.joinRoom('${docSnap.id}')" ${pCount >= 4 ? 'disabled' : ''} class="w-full py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white font-bold rounded-lg transition-colors">
-                                ${pCount >= 4 ? '만원' : '입장하기'}
+                            <button onclick="window.joinRoom('${docSnap.id}')" ${pCount >= 100 ? 'disabled' : ''} class="w-full py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white font-bold rounded-lg transition-colors">
+                                ${pCount >= 100 ? '만원' : '입장하기'}
                             </button>
                         `;
                         listEl.appendChild(div);
@@ -368,12 +375,15 @@
                 if (!hasRooms) {
                     listEl.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 font-bold bg-slate-50 rounded-xl border border-slate-200 border-dashed">개설된 방이 없습니다.<br>새로운 방을 만들어보세요!</div>';
                 }
-            }, (error) => { console.error(error); });
+            }, (error) => { 
+                console.error(error); 
+                window.showToast("방 목록을 불러오지 못했습니다. DB 권한 설정을 확인하세요.", true);
+            });
         };
 
         // -- 3. 방 조작 --
         window.createRoom = async () => {
-            if(!window.myUser.uid) return;
+            if(!window.myUser.uid) return window.showToast("연결 상태를 확인해주세요.", true);
             try {
                 const roomRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
                 const initialPlayers = {};
@@ -397,7 +407,7 @@
         };
 
         window.joinRoom = async (roomId) => {
-            if(!window.myUser.uid) return;
+            if(!window.myUser.uid) return window.showToast("연결 상태를 확인해주세요.", true);
             try {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
                 const snap = await getDoc(roomRef);
@@ -407,7 +417,7 @@
                 if (room.status !== 'waiting') return window.showToast("이미 게임이 진행중입니다.", true);
                 
                 const playersCount = Object.keys(room.players || {}).length;
-                if (playersCount >= 4 && !room.players[window.myUser.uid]) return window.showToast("인원이 가득 찼습니다.", true);
+                if (playersCount >= 100 && !room.players[window.myUser.uid]) return window.showToast("인원이 가득 찼습니다.", true);
 
                 await updateDoc(roomRef, {
                     [`players.${window.myUser.uid}`]: {
@@ -419,7 +429,7 @@
                     }
                 });
                 enterRoom(roomId, false);
-            } catch(e) { console.error(e); window.showToast("입장에 실패했습니다.", true); }
+            } catch(e) { console.error(e); window.showToast("입장 실패", true); }
         };
 
         const enterRoom = (roomId, hostStatus) => {
@@ -464,7 +474,6 @@
                             updates.hostName = players[newHostUid].name;
                             players[newHostUid].isHost = true;
                         }
-                        // 만약 게임 중인데 나갔다면, 남은 사람들이 모두 끝났는지 체크해야함. (간단히 유지)
                         await updateDoc(roomRef, updates);
                     }
                 }
@@ -679,7 +688,7 @@
             }, 500);
         };
 
-        // --- 인게임 리더보드 그리기 (사과게임 스타일) ---
+        // --- 인게임 리더보드 그리기 ---
         const renderInGameLeaderboard = () => {
             const container = document.getElementById('in-game-leaderboard');
             document.getElementById('ingame-player-count').innerText = Object.keys(playersData).length;
