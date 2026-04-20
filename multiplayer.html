@@ -286,7 +286,9 @@
         }
 
         // -- 전역 상태 변수 --
-        window.myUser = { uid: null, name: '' };
+        // 로컬 테스트(동일 브라우저 멀티 탭)에서 유저 덮어씌움 현상을 막기 위해, 고유한 Session ID 발급
+        const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        window.myUser = { uid: null, name: '', sessionId: generateId() };
         window.currentRoomId = null;
         window.isHost = false;
         
@@ -370,9 +372,6 @@
             }
             
             if(!window.myUser.uid) {
-                if (!isCanvas && firebaseConfig.apiKey === "YOUR_API_KEY") {
-                    return window.showToast("Firebase 키를 먼저 설정해주세요.", true);
-                }
                 return window.showToast("서버에 연결 중이거나 Firebase 설정이 올바르지 않습니다.", true);
             }
             
@@ -387,7 +386,7 @@
         // -- 1. 인증 로직 --
         const initAuth = async () => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                if (isCanvas && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
@@ -505,7 +504,7 @@
             try {
                 const roomRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
                 const initialPlayers = {};
-                initialPlayers[window.myUser.uid] = {
+                initialPlayers[window.myUser.sessionId] = {
                     name: window.myUser.name,
                     score: 0,
                     progress: TOTAL_MATCHES,
@@ -515,7 +514,7 @@
 
                 await setDoc(roomRef, {
                     status: 'waiting',
-                    hostUid: window.myUser.uid,
+                    hostSessionId: window.myUser.sessionId,
                     hostName: window.myUser.name,
                     players: initialPlayers,
                     createdAt: Date.now()
@@ -535,10 +534,10 @@
                 if (room.status !== 'waiting') return window.showToast("이미 게임이 진행중입니다.", true);
                 
                 const playersCount = Object.keys(room.players || {}).length;
-                if (playersCount >= 100 && !room.players[window.myUser.uid]) return window.showToast("인원이 가득 찼습니다.", true);
+                if (playersCount >= 100 && !room.players[window.myUser.sessionId]) return window.showToast("인원이 가득 찼습니다.", true);
 
                 await updateDoc(roomRef, {
-                    [`players.${window.myUser.uid}`]: {
+                    [`players.${window.myUser.sessionId}`]: {
                         name: window.myUser.name,
                         score: 0,
                         progress: TOTAL_MATCHES,
@@ -580,17 +579,17 @@
                 if (snap.exists()) {
                     const room = snap.data();
                     const players = { ...room.players };
-                    delete players[window.myUser.uid];
+                    delete players[window.myUser.sessionId];
                     
                     if (Object.keys(players).length === 0) {
                         await deleteDoc(roomRef);
                     } else {
                         let updates = { players };
-                        if (room.hostUid === window.myUser.uid) {
-                            const newHostUid = Object.keys(players)[0];
-                            updates.hostUid = newHostUid;
-                            updates.hostName = players[newHostUid].name;
-                            players[newHostUid].isHost = true;
+                        if (room.hostSessionId === window.myUser.sessionId) {
+                            const newHostId = Object.keys(players)[0];
+                            updates.hostSessionId = newHostId;
+                            updates.hostName = players[newHostId].name;
+                            players[newHostId].isHost = true;
                         }
                         await updateDoc(roomRef, updates);
                     }
@@ -621,7 +620,7 @@
                 gameStatus = room.status;
 
                 // 호스트 위임 체크
-                if (room.hostUid === window.myUser.uid && !window.isHost) {
+                if (room.hostSessionId === window.myUser.sessionId && !window.isHost) {
                     window.isHost = true;
                     if (gameStatus === 'waiting') {
                         document.getElementById('btn-start-game').classList.remove('hidden');
@@ -666,12 +665,12 @@
             const listEl = document.getElementById('player-list');
             listEl.innerHTML = '';
             
-            const uids = Object.keys(playersData);
-            document.getElementById('player-count').innerText = uids.length;
+            const sessionIds = Object.keys(playersData);
+            document.getElementById('player-count').innerText = sessionIds.length;
 
-            uids.forEach(uid => {
-                const p = playersData[uid];
-                const isMe = uid === window.myUser.uid;
+            sessionIds.forEach(sid => {
+                const p = playersData[sid];
+                const isMe = sid === window.myUser.sessionId;
                 const div = document.createElement('div');
                 div.className = `flex items-center gap-3 p-3 bg-white rounded-xl border ${isMe ? 'border-blue-400 shadow-sm' : 'border-slate-200'}`;
                 div.innerHTML = `
@@ -813,10 +812,10 @@
             container.innerHTML = '';
             
             // 점수 순위 (내림차순)
-            const sorted = Object.keys(playersData).map(uid => ({uid, ...playersData[uid]})).sort((a,b) => b.score - a.score);
+            const sorted = Object.keys(playersData).map(sid => ({sid, ...playersData[sid]})).sort((a,b) => b.score - a.score);
 
             sorted.forEach((p, idx) => {
-                const isMe = p.uid === window.myUser.uid;
+                const isMe = p.sid === window.myUser.sessionId;
                 const percent = Math.floor(((TOTAL_MATCHES - p.progress) / TOTAL_MATCHES) * 100);
                 
                 const div = document.createElement('div');
@@ -1121,8 +1120,8 @@
             try {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId);
                 await updateDoc(roomRef, {
-                    [`players.${window.myUser.uid}.score`]: myScore,
-                    [`players.${window.myUser.uid}.progress`]: myMatchesLeft
+                    [`players.${window.myUser.sessionId}.score`]: myScore,
+                    [`players.${window.myUser.sessionId}.progress`]: myMatchesLeft
                 });
             } catch(e) {}
         };
@@ -1147,9 +1146,9 @@
                 try {
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId);
                     await updateDoc(roomRef, {
-                        [`players.${window.myUser.uid}.score`]: myScore,
-                        [`players.${window.myUser.uid}.progress`]: myMatchesLeft,
-                        [`players.${window.myUser.uid}.isFinished`]: true
+                        [`players.${window.myUser.sessionId}.score`]: myScore,
+                        [`players.${window.myUser.sessionId}.progress`]: myMatchesLeft,
+                        [`players.${window.myUser.sessionId}.isFinished`]: true
                     });
                 } catch(e) {}
             }
@@ -1162,10 +1161,10 @@
             const listEl = document.getElementById('final-results-list');
             listEl.innerHTML = '';
 
-            const sorted = Object.keys(playersData).map(uid => ({uid, ...playersData[uid]})).sort((a,b) => b.score - a.score);
+            const sorted = Object.keys(playersData).map(sid => ({sid, ...playersData[sid]})).sort((a,b) => b.score - a.score);
 
             sorted.forEach((p, idx) => {
-                const isMe = p.uid === window.myUser.uid;
+                const isMe = p.sid === window.myUser.sessionId;
                 const div = document.createElement('div');
                 div.className = `flex justify-between items-center p-4 rounded-2xl ${idx===0 ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-yellow-400 transform scale-105' : 'bg-slate-800 border border-slate-600'} shadow-lg`;
                 
