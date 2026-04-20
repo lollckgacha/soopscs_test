@@ -257,6 +257,8 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        console.log("Multiplayer Build Version: 2.1 (Cache Busting)");
+
         // 환경 감지
         const isCanvas = typeof __firebase_config !== 'undefined';
         
@@ -347,7 +349,7 @@
                 await signInWithPopup(auth, p); 
             } catch (e) { 
                 console.error(e); 
-                window.showToast("구글 로그인에 실패했습니다.", true);
+                window.showToast("구글 로그인에 실패했습니다. " + e.message, true);
             }
         };
 
@@ -372,7 +374,7 @@
             }
             
             if(!window.myUser.uid) {
-                return window.showToast("서버에 연결 중이거나 Firebase 설정이 올바르지 않습니다.", true);
+                return window.showToast("서버에 연결 중이거나 Firebase 설정이 올바르지 않습니다. 다시 시도해주세요.", true);
             }
             
             window.myUser.name = nick;
@@ -397,7 +399,7 @@
                 }
             } catch (e) {
                 console.error("Auth Error", e);
-                window.showToast("인증 실패: DB 설정을 확인하세요.", true);
+                window.showToast("인증 실패: DB 설정을 확인하세요. (" + e.message + ")", true);
             }
         };
 
@@ -493,14 +495,14 @@
                     listEl.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 font-bold bg-slate-50 rounded-xl border border-slate-200 border-dashed">개설된 방이 없습니다.<br>새로운 방을 만들어보세요!</div>';
                 }
             }, (error) => { 
-                console.error(error); 
-                window.showToast("방 목록을 불러오지 못했습니다. DB 권한 설정을 확인하세요.", true);
+                console.error("방 목록 로드 실패:", error); 
+                window.showToast("방 목록을 불러오지 못했습니다: " + error.message, true);
             });
         };
 
         // -- 3. 방 조작 --
         window.createRoom = async () => {
-            if(!window.myUser.uid) return window.showToast("연결 상태를 확인해주세요.", true);
+            if(!window.myUser.uid) return window.showToast("서버 연결 상태를 확인해주세요.", true);
             try {
                 const roomRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
                 const initialPlayers = {};
@@ -520,11 +522,14 @@
                     createdAt: Date.now()
                 });
                 enterRoom(roomRef.id, true);
-            } catch (e) { console.error(e); window.showToast("방 생성 실패", true); }
+            } catch (e) { 
+                console.error("방 생성 에러:", e); 
+                window.showToast("방 생성 실패: " + e.message, true); 
+            }
         };
 
         window.joinRoom = async (roomId) => {
-            if(!window.myUser.uid) return window.showToast("연결 상태를 확인해주세요.", true);
+            if(!window.myUser.uid) return window.showToast("서버 연결 상태를 확인해주세요.", true);
             try {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
                 const snap = await getDoc(roomRef);
@@ -536,17 +541,24 @@
                 const playersCount = Object.keys(room.players || {}).length;
                 if (playersCount >= 100 && !room.players[window.myUser.sessionId]) return window.showToast("인원이 가득 찼습니다.", true);
 
-                await updateDoc(roomRef, {
-                    [`players.${window.myUser.sessionId}`]: {
-                        name: window.myUser.name,
-                        score: 0,
-                        progress: TOTAL_MATCHES,
-                        isFinished: false,
-                        isHost: false
+                // 안전한 입장 로직 (merge 사용)
+                await setDoc(roomRef, {
+                    players: {
+                        [window.myUser.sessionId]: {
+                            name: window.myUser.name,
+                            score: 0,
+                            progress: TOTAL_MATCHES,
+                            isFinished: false,
+                            isHost: false
+                        }
                     }
-                });
+                }, { merge: true });
+                
                 enterRoom(roomId, false);
-            } catch(e) { console.error(e); window.showToast("입장 실패", true); }
+            } catch(e) { 
+                console.error("방 입장 에러:", e); 
+                window.showToast("입장 실패: " + e.message, true); 
+            }
         };
 
         const enterRoom = (roomId, hostStatus) => {
@@ -1114,16 +1126,22 @@
             }, 500);
         };
 
-        // 내 점수/진행도를 서버에 주기적으로 알림
+        // 내 점수/진행도를 서버에 주기적으로 알림 (안전한 병합 방식)
         const syncMyProgress = async () => {
             if(!window.currentRoomId || !window.myUser.uid) return;
             try {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId);
-                await updateDoc(roomRef, {
-                    [`players.${window.myUser.sessionId}.score`]: myScore,
-                    [`players.${window.myUser.sessionId}.progress`]: myMatchesLeft
-                });
-            } catch(e) {}
+                await setDoc(roomRef, {
+                    players: {
+                        [window.myUser.sessionId]: {
+                            score: myScore,
+                            progress: myMatchesLeft
+                        }
+                    }
+                }, { merge: true });
+            } catch(e) {
+                console.error("진행도 동기화 실패:", e);
+            }
         };
 
         // 내 보드 완료 처리
@@ -1145,12 +1163,18 @@
             if(window.currentRoomId && window.myUser.uid) {
                 try {
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId);
-                    await updateDoc(roomRef, {
-                        [`players.${window.myUser.sessionId}.score`]: myScore,
-                        [`players.${window.myUser.sessionId}.progress`]: myMatchesLeft,
-                        [`players.${window.myUser.sessionId}.isFinished`]: true
-                    });
-                } catch(e) {}
+                    await setDoc(roomRef, {
+                        players: {
+                            [window.myUser.sessionId]: {
+                                score: myScore,
+                                progress: myMatchesLeft,
+                                isFinished: true
+                            }
+                        }
+                    }, { merge: true });
+                } catch(e) {
+                    console.error("완료 처리 동기화 실패:", e);
+                }
             }
         };
 
